@@ -20,7 +20,7 @@ MainWindow::~MainWindow() { delete ui; }
 void MainWindow::loadFile() {
 
   fileName = QFileDialog::getOpenFileName(this, tr("Öffne Zeus Textdatei"),
-                                          QDir::homePath(),
+                                          QDir::homePath()+"/Documents/SVLFG/SVLFGWorktime/Worktime",
                                           tr("Zeus Datei (*.csv *.txt)"));
   QFile file(fileName);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -89,6 +89,7 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
   qDebug() << s;
 
   // filtert die Monats- und Jahrzeile
+  // ------------------------------------------------------------------------------------
   QRegularExpressionMatch match0 = re0.match(s);
   if (match0.hasMatch()) {
     month = match0.captured(1).trimmed();
@@ -105,6 +106,7 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
     currMonth.setYearMonth(QDate(year.toInt(), intMonth, 1));   // Hinein ins Monat Objekt
   }
   // sucht erste Zeile mit Periodenübertrag
+  // ------------------------------------------------------------------------------------
   QRegularExpressionMatch match1 = re1.match(s);
   if (match1.hasMatch()) {
     day = match1.captured(1);
@@ -116,6 +118,7 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
     currMonth.setStrSaldo(uebertrag);   // Hinein ins Monat Objekt
   }
   // filtert die Tageszeile
+  // ------------------------------------------------------------------------------------
   QRegularExpressionMatch match2 = re2.match(s);
   if (match2.hasMatch()) {
     day = match2.captured(1);                       // Wochentagname
@@ -136,7 +139,12 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
       at->setKommtBuchung(time1);                      // Hinein ins Arbeitsplatz Objekt (QStringList)
       at->setGehtBuchung(time2);                       // Hinein ins Arbeitsplatz Objekt (QStringList)
     }
-    mittelteil2 = match2.captured(7);               // Brauchen wir da was von?????
+    mittelteil2 = match2.captured(7);               // Brauchen wir da was von? Ja! "Buchungvergessen"
+    if(mittelteil2.contains("Buchung vergessen")){
+        at->clear();
+        // processed = 0;
+        return processed;
+    }
     endteil = match2.captured(8);
     if (!endteil.isEmpty()) {                   // Endteil vorhanden ->Abschluss des Arbeitstages
       QRegularExpressionMatch match3 = re3.match(endteil);
