@@ -123,8 +123,6 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
   // ------------------------------------------------------------------------------------
   QRegularExpressionMatch match2 = re2.match(s);
   if (match2.hasMatch()) {
-    enum LastBuchungsart {NT, FA, Undefined};
-    LastBuchungsart lastBuchung = Undefined;        // Zeigt an, ob letzte Buchung Bürobuchung oder FA Buchung war
     day = match2.captured(1);                       // Wochentagname
     day_nr = match2.captured(2);                    // Wochentag Nr.
     QString time1 = match2.captured(3).trimmed();   // Startzeit
@@ -138,35 +136,16 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
     at->setDate(                                    // Hinein ins Arbeitsplatz Objekt (der genaue Arbeitstag)
         QDate(at->getDate().year(), at->getDate().month(), day_nr.toInt()));
     if (time1.isEmpty() && minus.compare("-") == 0) {  // Ist FA-Buchung ( - xx:yy)
-      at->setFaBuchung(time2);                         // Hinein ins Arbeitsplatz Objekt
-      lastBuchung = FA;
+      at->setFaBuchung(time2);  // Hinein ins Arbeitsplatz Objekt
+    } else if(!time1.isEmpty() && time2.isEmpty()){ // Nur Anfangszeit (xx:yy - )
+        at->setKommtBuchung(time1);                      // Hinein ins Arbeitsplatz Objekt (QStringList)
     } else if (!time1.isEmpty() && !time2.isEmpty()) {  // NT-Buchung  (xx:yy - xx:yy)
       at->setKommtBuchung(time1);                      // Hinein ins Arbeitsplatz Objekt (QStringList)
       at->setGehtBuchung(time2);                       // Hinein ins Arbeitsplatz Objekt (QStringList)
-      lastBuchung = NT;
     }
     mittelteil2 = match2.captured(7);               // "Buchung vergessen"
     if(mittelteil2.contains("Buchung vergessen")){  // keine paarige Buchung für NT oder FA vorhanden !
-        switch(lastBuchung){
-        case Undefined: // überhaupt keine Buchung vorhanden?-> Tag ohne Buchung beenden
-            at->clear();
-            processed = 0;   // gilt als nicht bearbeitet
-            break;
-        case FA:
-            processed = 1;   // gilt als bearbeitet
-            // letzte FA Buchung wieder löschen...
-            at->popFABuchung();
-            break;
-        case NT:
-            // letzte NT Buchung wieder löschen...
-            processed = 1;   // gilt als bearbeitet
-            at->popNTBuchung();
-            break;
-        default:
-            qDebug()<<"Sollte nicht passieren";
-        };
-
-        return processed;   // auf jeden Fall Arbeitstag beenden
+        at->cleanBuchungen();   // Vorsicht: es wird immer die LETZTE überzählige Buchung gelöscht!
     }
     endteil = match2.captured(8);
     if (!endteil.isEmpty()) {                   // Endteil vorhanden ->Abschluss des Arbeitstages

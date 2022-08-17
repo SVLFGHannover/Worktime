@@ -46,9 +46,10 @@ public:
   void setGehtBuchung(const QString &newGehtZeit);
   const QStringList &getFaBuchung() const;
   void setFaBuchung(const QString &newFaBuchung);
-  qint32 popFaBuchung();
-  qint32 popNTBuchung();
+  void popFaBuchung();
+  void popNTBuchung();
 
+  void cleanBuchungen();
   void
   clear(); // setzt alle Werte bis aufs Datum zurück für einen neuen Arbeitstag
   void auswerten(); // Wertet Buchungszeitpunkte aus und summiert unter NT/FA Zeit

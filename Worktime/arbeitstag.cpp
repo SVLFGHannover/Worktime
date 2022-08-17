@@ -59,25 +59,28 @@ void Arbeitstag::setGehtBuchung(const QString &newGehtBuchung) {
   gehtBuchung.append(newGehtBuchung);
 }
 
-qint32 Arbeitstag::popNTBuchung(){
-    qint32 retVal=kommtBuchung.count(); // kommt/geht immer gleich??
-    if(retVal > 0){
+void Arbeitstag::popNTBuchung(){
+    if((kommtBuchung.count() > gehtBuchung.count()) && kommtBuchung.count()>0){
         kommtBuchung.removeLast();
-        gehtBuchung.removeLast();
+        qDebug()<<"Bürobuchung (Kommt) wurde korrigiert";
     }
-    return kommtBuchung.count();
+    if((gehtBuchung.count() > kommtBuchung.count()) && gehtBuchung.count()>0){
+        gehtBuchung.removeLast();
+        qDebug()<<"Bürobuchung (Geht) wurde korrigiert";
+    }
+    return;
 }
 
 void Arbeitstag::setFaBuchung(const QString &newFaBuchung) {
   faBuchung.append(newFaBuchung);
 }
 
-qint32 Arbeitstag::popFaBuchung(){
-    qint32 retVal = faBuchung.count();
-    if(retVal > 0){
+void Arbeitstag::popFaBuchung(){
+    if(faBuchung.count() > 0){
         faBuchung.removeLast();
+        qDebug()<<"Die letzte FA-Buchung wurde korrigiert";
     }
-    return faBuchung.count();
+    return;
 }
 
 void Arbeitstag::setZeitZeus(const QString &newZeitZeus)
@@ -92,6 +95,16 @@ void Arbeitstag::setIntZeitZeus(qint32 newIntZeitZeus)
     zeitZeus = minutes2String(intZeitZeus);
 }
 
+void Arbeitstag::cleanBuchungen(){
+    // löscht die letzten von unpaarigen Buchungen
+    if(kommtBuchung.count() != gehtBuchung.count()){
+        popNTBuchung();
+    }
+    if(faBuchung.count() & 1){
+        popFaBuchung();
+    }
+
+}
 void Arbeitstag::setDate(const QDate &newDate) { date = newDate; }
 void Arbeitstag::setCompleted(bool newCompleted) { completed = newCompleted; }
 
