@@ -59,8 +59,25 @@ void Arbeitstag::setGehtBuchung(const QString &newGehtBuchung) {
   gehtBuchung.append(newGehtBuchung);
 }
 
+qint32 Arbeitstag::popNTBuchung(){
+    qint32 retVal=kommtBuchung.count(); // kommt/geht immer gleich??
+    if(retVal > 0){
+        kommtBuchung.removeLast();
+        gehtBuchung.removeLast();
+    }
+    return kommtBuchung.count();
+}
+
 void Arbeitstag::setFaBuchung(const QString &newFaBuchung) {
   faBuchung.append(newFaBuchung);
+}
+
+qint32 Arbeitstag::popFaBuchung(){
+    qint32 retVal = faBuchung.count();
+    if(retVal > 0){
+        faBuchung.removeLast();
+    }
+    return faBuchung.count();
 }
 
 void Arbeitstag::setZeitZeus(const QString &newZeitZeus)

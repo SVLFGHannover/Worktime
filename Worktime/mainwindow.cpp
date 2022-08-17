@@ -63,6 +63,7 @@ void MainWindow::loadFile() {
 }
 
 // Hier wird jede Zeile untersucht und geparst ++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Gibt die Anzahl der bearbeiteten Zeilen (0,1) zurück
 qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
   qint64 processed = 0; // zeigt, ob Zeile verarbeitet wurde
   QString pattern_monthyear(
@@ -80,15 +81,14 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
   QString uebertrag;
   QString month, year, day, day_nr;
   qint32 intMonth = 0;
-  QStringList mNamen = {"Januar",    "Februar", "März",     "April",
-                        "Mai",       "Juni",    "Juli",     "August",
-                        "September", "Oktober", "November", "Dezember"};
+  QStringList mNamen = {"Januar",    "Februar", "März",     "April",    "Mai",  "Juni",
+                        "Juli",     "August",   "September", "Oktober", "November", "Dezember"};
   QString mittelteil2;
   QString endteil;
   QString line = "";
   qDebug() << s;
 
-  // filtert die Monats- und Jahrzeile
+  // filtert die Monats- und Jahrzeile  ; bestimmt den Monat/Jahr des Arbeitszeit-Objekts
   // ------------------------------------------------------------------------------------
   QRegularExpressionMatch match0 = re0.match(s);
   if (match0.hasMatch()) {
@@ -105,22 +105,26 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
     ui->listWidget_2->addItem(line);
     currMonth.setYearMonth(QDate(year.toInt(), intMonth, 1));   // Hinein ins Monat Objekt
   }
-  // sucht erste Zeile mit Periodenübertrag
+
+  // sucht erste Zeile mit Periodenübertrag zum Speichern im Monat
   // ------------------------------------------------------------------------------------
   QRegularExpressionMatch match1 = re1.match(s);
   if (match1.hasMatch()) {
     day = match1.captured(1);
     day_nr = "1";
-    at->setDate(QDate(at->getDate().year(), at->getDate().month(), 1));
+    at->setDate(QDate(at->getDate().year(), at->getDate().month(), 1)); // doppelt hält besser
     uebertrag = match1.captured(2);
     line = "(" + at->getDate().toString() + " Übertrag:" + uebertrag + ")";
     ui->listWidget_2->addItem(line);
     currMonth.setStrSaldo(uebertrag);   // Hinein ins Monat Objekt
   }
-  // filtert die Tageszeile
+
+  // filtert die Tageszeile (hier muss der entsprechende regEx immer (auch bei Buchungsfehlern) passen!)
   // ------------------------------------------------------------------------------------
   QRegularExpressionMatch match2 = re2.match(s);
   if (match2.hasMatch()) {
+    enum LastBuchungsart {NT, FA, Undefined};
+    LastBuchungsart lastBuchung = Undefined;        // Zeigt an, ob letzte Buchung Bürobuchung oder FA Buchung war
     day = match2.captured(1);                       // Wochentagname
     day_nr = match2.captured(2);                    // Wochentag Nr.
     QString time1 = match2.captured(3).trimmed();   // Startzeit
@@ -131,19 +135,38 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
       kennung = match2.captured(6).trimmed();       // Kennung FA,URL,SAB,F,GLT
       at->setZeitFehlGrund(kennung);                // Hinein ins Arbeitsplatz Objekt
     }
-    at->setDate(                                    // Hinein ins Arbeitsplatz Objekt
+    at->setDate(                                    // Hinein ins Arbeitsplatz Objekt (der genaue Arbeitstag)
         QDate(at->getDate().year(), at->getDate().month(), day_nr.toInt()));
-    if (time1.isEmpty() && minus.compare("-") == 0) {  // Ist FA-Buchung
+    if (time1.isEmpty() && minus.compare("-") == 0) {  // Ist FA-Buchung ( - xx:yy)
       at->setFaBuchung(time2);                         // Hinein ins Arbeitsplatz Objekt
-    } else if (!time1.isEmpty() && !time2.isEmpty()) {  // NT-Buchung
+      lastBuchung = FA;
+    } else if (!time1.isEmpty() && !time2.isEmpty()) {  // NT-Buchung  (xx:yy - xx:yy)
       at->setKommtBuchung(time1);                      // Hinein ins Arbeitsplatz Objekt (QStringList)
       at->setGehtBuchung(time2);                       // Hinein ins Arbeitsplatz Objekt (QStringList)
+      lastBuchung = NT;
     }
-    mittelteil2 = match2.captured(7);               // Brauchen wir da was von? Ja! "Buchungvergessen"
-    if(mittelteil2.contains("Buchung vergessen")){
-        at->clear();
-        // processed = 0;
-        return processed;
+    mittelteil2 = match2.captured(7);               // "Buchung vergessen"
+    if(mittelteil2.contains("Buchung vergessen")){  // keine paarige Buchung für NT oder FA vorhanden !
+        switch(lastBuchung){
+        case Undefined: // überhaupt keine Buchung vorhanden?-> Tag ohne Buchung beenden
+            at->clear();
+            processed = 0;   // gilt als nicht bearbeitet
+            break;
+        case FA:
+            processed = 1;   // gilt als bearbeitet
+            // letzte FA Buchung wieder löschen...
+            at->popFABuchung();
+            break;
+        case NT:
+            // letzte NT Buchung wieder löschen...
+            processed = 1;   // gilt als bearbeitet
+            at->popNTBuchung();
+            break;
+        default:
+            qDebug()<<"Sollte nicht passieren";
+        };
+
+        return processed;   // auf jeden Fall Arbeitstag beenden
     }
     endteil = match2.captured(8);
     if (!endteil.isEmpty()) {                   // Endteil vorhanden ->Abschluss des Arbeitstages
