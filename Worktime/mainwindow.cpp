@@ -55,7 +55,7 @@ void MainWindow::loadFile() {
   ui->label_fileCount->setText(QString("%1").arg(ui->listWidget->count(),8)); // Anzahl der Files aus listWidget
 
   // Nur bei Debug ausgeben
-  qDebug() << "Ausgabe des Arrays:";
+  qDebug() << "Ausgabe der bearbeiteten Tage (atArray):";
   for (int i = 0; i < atArray.count(); i++) {
     qDebug() << atArray[i].getDate() << atArray[i].getZeitSoll()
              << atArray[i].getZeitNT() << atArray[i].getZeitFA();
@@ -86,7 +86,7 @@ qint64 MainWindow::process_line(Arbeitstag *at, QString s) {
   QString mittelteil2;
   QString endteil;
   QString line = "";
-  qDebug() << s;
+  qDebug() << "Zeile unbearbeitet: " << s;
 
   // filtert die Monats- und Jahrzeile  ; bestimmt den Monat/Jahr des Arbeitszeit-Objekts
   // ------------------------------------------------------------------------------------

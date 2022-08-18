@@ -60,13 +60,13 @@ void Arbeitstag::setGehtBuchung(const QString &newGehtBuchung) {
 }
 
 void Arbeitstag::popNTBuchung(){
-    if((kommtBuchung.count() > gehtBuchung.count()) && kommtBuchung.count()>0){
+    if((kommtBuchung.count() > gehtBuchung.count()) && !kommtBuchung.isEmpty()){
         kommtBuchung.removeLast();
-        qDebug()<<"Bürobuchung (Kommt) wurde korrigiert";
+        qDebug()<<"Letzte Bürobuchung (Kommt) wurde entfernt";
     }
-    if((gehtBuchung.count() > kommtBuchung.count()) && gehtBuchung.count()>0){
+    if((gehtBuchung.count() > kommtBuchung.count()) && !gehtBuchung.isEmpty()){
         gehtBuchung.removeLast();
-        qDebug()<<"Bürobuchung (Geht) wurde korrigiert";
+        qDebug()<<"Letzte Bürobuchung (Geht) wurde entfernt";
     }
     return;
 }
@@ -76,9 +76,9 @@ void Arbeitstag::setFaBuchung(const QString &newFaBuchung) {
 }
 
 void Arbeitstag::popFaBuchung(){
-    if(faBuchung.count() > 0){
+    if(!faBuchung.isEmpty()){
         faBuchung.removeLast();
-        qDebug()<<"Die letzte FA-Buchung wurde korrigiert";
+        qDebug()<<"Letzte FA-Buchung wurde entfernt";
     }
     return;
 }
@@ -100,11 +100,12 @@ void Arbeitstag::cleanBuchungen(){
     if(kommtBuchung.count() != gehtBuchung.count()){
         popNTBuchung();
     }
-    if(faBuchung.count() & 1){
+    if(faBuchung.count() & 1){  // ungerade
         popFaBuchung();
     }
 
 }
+
 void Arbeitstag::setDate(const QDate &newDate) { date = newDate; }
 void Arbeitstag::setCompleted(bool newCompleted) { completed = newCompleted; }
 
@@ -140,6 +141,11 @@ void Arbeitstag::auswerten() {
       "19:00"); // ausserhalb dieser Zeiten wird nichts gezählt
 
   qint64 deltaMinuten = 0;
+  qint64 deltaNTMinuten = 0;
+  qint64 deltaFAMinuten = 0;
+  qint64 deltaMaxPause = 0;
+  qint64 deltaNTMaxPause = 0;
+  qint64 deltaFAMaxPause = 0;
   // Kommt Geht summieren
   for (int i = 0; i < kommtBuchung.count(); i++) {
     t1 = QTime::fromString(kommtBuchung[i], "H:mm"); // kommtZeit[i]
@@ -150,20 +156,11 @@ void Arbeitstag::auswerten() {
     if (t2 > t2max) {
       t2 = t2max;
     }
-    deltaMinuten += (t1.secsTo(t2)) / 60;
+    deltaMinuten += (t1.secsTo(t2)) / 60;       // Gesamtzeit
+    deltaNTMinuten += (t1.secsTo(t2)) / 60;     // Nur NT Zeit
   }
-  // Mittagspause abziehen; TODO: Wenn Arbeitsunterbrechung mehr als 15 Minuten,
-  // auf Mittagspause anrechnen
-  if (deltaMinuten > 360) {
-    deltaMinuten -= 30;
-  }
-  if (deltaMinuten > 540) {
-    deltaMinuten -= 15;
-  }
+  qDebug()<<"Gesamtzeit NT ohne Abzüge:"<<deltaNTMinuten;
 
-  setIntZeitNT(deltaMinuten);
-
-  deltaMinuten = 0;
   // faZeit summieren
   for (int i = 0; i < faBuchung.count(); i += 2) {
     t1 = QTime::fromString(faBuchung[i], "H:mm");     // faZeit[i]
@@ -174,17 +171,89 @@ void Arbeitstag::auswerten() {
     if (t2 > t2max) {
       t2 = t2max;
     }
-    deltaMinuten += (t1.secsTo(t2)) / 60;
+    deltaMinuten += (t1.secsTo(t2)) / 60;       // Gesamtzeit
+    deltaFAMinuten += (t1.secsTo(t2)) / 60;     // Nur FA Zeit
   }
-  // Mittagspause abziehen; TODO: Wenn Arbeitsunterbrechung mehr als 15 Minuten,
-  // auf Mittagspause anrechnen
+  qDebug()<<"Gesamtzeit FA ohne Abzüge:"<<deltaFAMinuten;
+  qDebug()<<"Gesamtzeit NT+FA ohne Abzüge:"<<deltaMinuten;
+
+  // Maximale Pause für NT-Buchung finden
+  for (int i = 0; i < gehtBuchung.count()-1; i++) {
+    t1 = QTime::fromString(gehtBuchung[i], "H:mm"); // gehtZeit[i]
+    t2 = QTime::fromString(kommtBuchung[i+1], "H:mm");  // kommtZeit[i]
+    if (t1 < t1min) {
+      t1 = t1min;
+    }
+    if (t2 > t2max) {
+      t2 = t2max;
+    }
+    if( ((t1.secsTo(t2)) / 60) > deltaNTMaxPause ){
+        deltaNTMaxPause = (t1.secsTo(t2)) / 60;
+    }
+  }
+  qDebug()<<"Maximale Pause (Minuten) für NT Zeit:"<<deltaNTMaxPause;
+
+  // Maximale Pause für FA-Buchung finden
+  for (int i = 1; i < faBuchung.count()-1; i += 2) {
+    t1 = QTime::fromString(faBuchung[i], "H:mm"); // gehtZeit[i]
+    t2 = QTime::fromString(faBuchung[i+1], "H:mm");  // kommtZeit[i]
+    if (t1 < t1min) {
+      t1 = t1min;
+    }
+    if (t2 > t2max) {
+      t2 = t2max;
+    }
+    if( ((t1.secsTo(t2)) / 60) > deltaFAMaxPause ){
+        deltaFAMaxPause = (t1.secsTo(t2)) / 60;
+    }
+  }
+  qDebug()<<"Maximale Pause (Minuten) für FA Zeit:"<<deltaFAMaxPause;
+
+
+  qint32 mittagspause=30;
+  qint32 mittagMin = 15;
+  qint32 abendpause=15;
+//  bool pauseAngerechnet = false;
+
+  // Grösste Pause suchen
+  if(deltaNTMaxPause > deltaMaxPause){
+      deltaMaxPause = deltaNTMaxPause;
+  }
+  if(deltaFAMaxPause > deltaMaxPause){
+      deltaMaxPause = deltaFAMaxPause;
+  }
+
+
+  if(deltaMaxPause>mittagMin){
+      if(deltaMaxPause>=mittagspause){
+          mittagspause = 0; // Mittagspause muss nicht mehr abgezogen werden
+      }
+      else{
+          mittagspause -=  deltaMaxPause;
+      }
+//      pauseAngerechnet = true;
+  }
+
+  // Mittagspause abziehen ABER wo????
+  // Auf das Verhältnis verteilen?
+
+  double fracNT = (double) deltaNTMinuten / (deltaNTMinuten+deltaFAMinuten);
+  double fracFA = (double) deltaFAMinuten / (deltaNTMinuten+deltaFAMinuten);
+
   if (deltaMinuten > 360) {
-    deltaMinuten -= 30;
+      deltaFAMinuten -= (mittagspause * fracFA);
+      deltaNTMinuten -= (mittagspause * fracNT);
+      deltaMinuten = deltaFAMinuten+deltaNTMinuten;
   }
   if (deltaMinuten > 540) {
-    deltaMinuten -= 15;
+      deltaFAMinuten -= (abendpause * fracFA);
+      deltaNTMinuten -= (abendpause * fracNT);
+//      deltaMinuten = deltaFAMinuten+deltaNTMinuten;
   }
-  setIntZeitFA(deltaMinuten);
+
+//  deltaMinuten = deltaNTMinuten+deltaFAMinuten;
+  setIntZeitFA(deltaFAMinuten);
+  setIntZeitNT(deltaNTMinuten);
 }
 
 
